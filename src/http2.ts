@@ -62,7 +62,7 @@ export async function _fetch(url: URL, options?: _FetchOptions): Promise<_FetchR
   }
 }
 
-const _clientCache: Record<string, ClientHttp2Session | undefined> = {}
+export const _clientCache: Record<string, ClientHttp2Session | undefined> = {}
 
 function _httpClient(origin: string, options: { pingInterval: number }): ClientHttp2Session {
   // Look for cached client

@@ -1,6 +1,7 @@
 import { ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http2'
-import { _fetch } from './http2'
+import { _fetch, _clientCache } from './http2'
 
+export const clientsCache = _clientCache
 export type RequestInfo = string | URL
 
 export interface RequestInit {
