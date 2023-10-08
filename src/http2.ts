@@ -69,7 +69,7 @@ function _httpClient(origin: string, options: { pingInterval: number }): ClientH
   const cachedClient = _clientCache[origin]
 
   // Return cached client if we have one
-  if (cachedClient) {
+  if (cachedClient && !cachedClient.closed && !cachedClient.destroyed) {
     return cachedClient
   }
 
