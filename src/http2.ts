@@ -60,7 +60,7 @@ export async function http2Fetch(
   )
 
   // Fetch the headers
-  const { headers, status } = await sendRequest(req, options, client)
+  const { headers, status } = await sendRequest(client, req, options)
 
   // Get status text
   const statusText = getStatusText(status)
@@ -127,9 +127,9 @@ function destroyClient(client: ClientHttp2Session, origin: string) {
 }
 
 function sendRequest(
+  client: ClientHttp2Session,
   req: ClientHttp2Stream,
-  options?: Http2FetchOptions,
-  client?: ClientHttp2Session
+  options?: Http2FetchOptions
 ): Promise<{ status: number; headers: IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     // Write request body if needed
@@ -140,10 +140,8 @@ function sendRequest(
     // Apply optional timeout
     if (typeof options?.timeout === 'number') {
       req.setTimeout(options.timeout, () => {
-        if (client) {
-          // @ts-ignore
-          client.timeoutErrorCounter = (client.timeoutErrorCounter || 0) + 1;
-        }
+        // @ts-ignore
+        client.timeoutErrorCounter = (client.timeoutErrorCounter || 0) + 1;
         req.close(constants.NGHTTP2_CANCEL)
         reject(new Http2TimeoutError(`Request timed out after ${options.timeout}ms`))
       })
