@@ -101,7 +101,18 @@ function httpClient(origin: string, options: { pingInterval: number }): ClientHt
         closeClient()
         return
       }
-      client.ping(noop)
+      try {
+        client.ping(noop)
+      } catch (error: any) {
+        if (
+          error.code === 'ERR_HTTP2_INVALID_SESSION' &&
+          error.message === 'The session has been destroyed'
+        ) {
+          closeClient()
+          return
+        }
+        throw error
+      }
     }, options.pingInterval).unref()
   }
 
