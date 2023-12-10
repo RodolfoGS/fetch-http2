@@ -1,6 +1,7 @@
 import { ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http2'
-import { Http2TimeoutError, http2Fetch } from './http2'
+import { Http2TimeoutError, http2Fetch, clientCache } from './http2'
 
+export const clientsCache = clientCache
 export type RequestInfo = string | URL
 
 export interface RequestInit {

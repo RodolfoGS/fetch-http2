@@ -60,7 +60,7 @@ export async function http2Fetch(
   )
 
   // Fetch the headers
-  const { headers, status } = await sendRequest(req, options)
+  const { headers, status } = await sendRequest(client, req, options)
 
   // Get status text
   const statusText = getStatusText(status)
@@ -74,14 +74,14 @@ export async function http2Fetch(
   }
 }
 
-const clientCache: Record<string, ClientHttp2Session | undefined> = {}
+export const clientCache: Record<string, ClientHttp2Session | undefined> = {}
 
 function httpClient(origin: string, options: { pingInterval: number }): ClientHttp2Session {
   // Look for cached client
   const cachedClient = clientCache[origin]
 
   // Return cached client if we have one
-  if (cachedClient) {
+  if (cachedClient && !cachedClient.closed && !cachedClient.destroyed) {
     return cachedClient
   }
 
@@ -96,7 +96,24 @@ function httpClient(origin: string, options: { pingInterval: number }): ClientHt
 
   // Send a ping every to keep client alive
   if (options.pingInterval > 0) {
-    timer = setInterval(() => client.ping(noop), options.pingInterval).unref()
+    timer = setInterval(() => {
+      if (client.closed || client.destroyed) {
+        closeClient()
+        return
+      }
+      try {
+        client.ping(noop)
+      } catch (error: any) {
+        if (
+          error.code === 'ERR_HTTP2_INVALID_SESSION' &&
+          error.message === 'The session has been destroyed'
+        ) {
+          closeClient()
+          return
+        }
+        throw error
+      }
+    }, options.pingInterval).unref()
   }
 
   // Create function to destroy client
@@ -118,7 +135,9 @@ function httpClient(origin: string, options: { pingInterval: number }): ClientHt
 
 function destroyClient(client: ClientHttp2Session, origin: string) {
   // Remove the client from cache
-  clientCache[origin] = undefined
+  if (clientCache[origin] === client) {
+    clientCache[origin] = undefined
+  }
 
   // Close the client
   if (client.closed !== true) {
@@ -127,6 +146,7 @@ function destroyClient(client: ClientHttp2Session, origin: string) {
 }
 
 function sendRequest(
+  client: ClientHttp2Session,
   req: ClientHttp2Stream,
   options?: Http2FetchOptions
 ): Promise<{ status: number; headers: IncomingHttpHeaders }> {
@@ -139,6 +159,8 @@ function sendRequest(
     // Apply optional timeout
     if (typeof options?.timeout === 'number') {
       req.setTimeout(options.timeout, () => {
+        // @ts-ignore
+        client.timeoutErrorCounter = (client.timeoutErrorCounter || 0) + 1;
         req.close(constants.NGHTTP2_CANCEL)
         reject(new Http2TimeoutError(`Request timed out after ${options.timeout}ms`))
       })
