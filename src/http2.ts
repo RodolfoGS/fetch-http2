@@ -96,7 +96,24 @@ function httpClient(origin: string, options: { pingInterval: number }): ClientHt
 
   // Send a ping every to keep client alive
   if (options.pingInterval > 0) {
-    timer = setInterval(() => client.ping(noop), options.pingInterval).unref()
+    timer = setInterval(() => {
+      if (client.closed || client.destroyed) {
+        closeClient()
+        return
+      }
+      try {
+        client.ping(noop)
+      } catch (error: any) {
+        if (
+          error.code === 'ERR_HTTP2_INVALID_SESSION' &&
+          error.message === 'The session has been destroyed'
+        ) {
+          closeClient()
+          return
+        }
+        throw error
+      }
+    }, options.pingInterval).unref()
   }
 
   // Create function to destroy client
@@ -118,7 +135,9 @@ function httpClient(origin: string, options: { pingInterval: number }): ClientHt
 
 function destroyClient(client: ClientHttp2Session, origin: string) {
   // Remove the client from cache
-  clientCache[origin] = undefined
+  if (clientCache[origin] === client) {
+    clientCache[origin] = undefined
+  }
 
   // Close the client
   if (client.closed !== true) {
